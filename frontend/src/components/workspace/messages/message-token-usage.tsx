@@ -2,7 +2,12 @@ import type { Message } from "@langchain/langgraph-sdk";
 import { CoinsIcon } from "lucide-react";
 
 import { useI18n } from "@/core/i18n/hooks";
-import { formatTokenCount, getUsageMetadata } from "@/core/messages/usage";
+import {
+  accumulateUsage,
+  formatTokenCount,
+  getUsageMetadata,
+  type TokenUsage,
+} from "@/core/messages/usage";
 import { cn } from "@/lib/utils";
 
 export function MessageTokenUsage({
@@ -16,42 +21,13 @@ export function MessageTokenUsage({
   isLoading?: boolean;
   message: Message;
 }) {
-  const { t } = useI18n();
-
   if (!enabled || isLoading || message.type !== "ai") {
     return null;
   }
 
   const usage = getUsageMetadata(message);
 
-  return (
-    <div
-      className={cn(
-        "text-muted-foreground border-border/60 mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 border-t pt-2 text-[11px]",
-        className,
-      )}
-    >
-      <span className="inline-flex items-center gap-1 font-medium">
-        <CoinsIcon className="size-3" />
-        {t.tokenUsage.label}
-      </span>
-      {usage ? (
-        <>
-          <span>
-            {t.tokenUsage.input}: {formatTokenCount(usage.inputTokens)}
-          </span>
-          <span>
-            {t.tokenUsage.output}: {formatTokenCount(usage.outputTokens)}
-          </span>
-          <span className="font-medium">
-            {t.tokenUsage.total}: {formatTokenCount(usage.totalTokens)}
-          </span>
-        </>
-      ) : (
-        <span>{t.tokenUsage.unavailableShort}</span>
-      )}
-    </div>
-  );
+  return <TokenUsageBadge className={className} usage={usage} />;
 }
 
 export function MessageTokenUsageList({
@@ -69,23 +45,53 @@ export function MessageTokenUsageList({
     return null;
   }
 
-  const aiMessages = messages.filter((message) => message.type === "ai");
+  const usage = accumulateUsage(messages);
+  const hasAIMessage = messages.some((message) => message.type === "ai");
 
-  if (aiMessages.length === 0) {
+  if (!hasAIMessage) {
     return null;
   }
 
+  return <TokenUsageBadge className={className} usage={usage} />;
+}
+
+function TokenUsageBadge({
+  className,
+  usage,
+}: {
+  className?: string;
+  usage: TokenUsage | null;
+}) {
+  const { t } = useI18n();
+
   return (
-    <>
-      {aiMessages.map((message, index) => (
-        <MessageTokenUsage
-          className={className}
-          enabled={enabled}
-          isLoading={isLoading}
-          key={message.id ?? index}
-          message={message}
-        />
-      ))}
-    </>
+    <div
+      className={cn(
+        "text-muted-foreground mt-2 flex flex-wrap items-center gap-2 text-[11px]",
+        className,
+      )}
+    >
+      <div className="border-border/60 bg-background/70 inline-flex flex-wrap items-center gap-x-3 gap-y-1 rounded-full border px-3 py-1.5">
+        <span className="inline-flex items-center gap-1 font-medium">
+          <CoinsIcon className="size-3" />
+          {t.tokenUsage.label}
+        </span>
+        {usage ? (
+          <>
+            <span>
+              {t.tokenUsage.input}: {formatTokenCount(usage.inputTokens)}
+            </span>
+            <span>
+              {t.tokenUsage.output}: {formatTokenCount(usage.outputTokens)}
+            </span>
+            <span className="font-medium">
+              {t.tokenUsage.total}: {formatTokenCount(usage.totalTokens)}
+            </span>
+          </>
+        ) : (
+          <span>{t.tokenUsage.unavailableShort}</span>
+        )}
+      </div>
+    </div>
   );
 }
